@@ -1,0 +1,59 @@
+<!DOCTYPE html><html lang="hi"><head><meta charset="utf-8"><title>Cloud Kitchen Kopaganj</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script></head><body>
+<h1>🍔 Cloud Kitchen</h1><div class="m">Delivery sirf Kopaganj me — 3 km ke andar</div>
+<img src="poster.jpg" alt="Kopaganj Cloud Kitchen" id="poster" style="width:100%;height:210px;object-fit:cover;object-position:top;border-radius:12px;margin:10px 0;cursor:zoom-in;display:block">
+<div id="pz" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:20;align-items:center;justify-content:center;padding:10px"><img src="poster.jpg" alt="poster" style="max-width:100%;max-height:100%;object-fit:contain"></div>
+<div id="track"></div><div id="map"></div>
+<h2>Menu</h2><div id="menu"></div>
+<div class="card"><b>Total: <span id="tot">₹0</span></b>
+<input id="nm" placeholder="Aapka naam"><input id="ph" type="tel" placeholder="Phone number"><textarea id="ad" placeholder="Pura pata (mohalla, landmark)"></textarea>
+<button class="g" id="loc">📍 Meri live location lo</button><div id="ls" class="m">Location zaroori hai</div>
+<h2>Payment</h2><label><input type="radio" name="pay" value="COD" checked> Cash on Delivery</label><br>
+<label id="onl"><input type="radio" name="pay" value="Online"> Online (UPI / Card)</label>
+<p><button class="w" id="go">Order karo</button></p></div>
+<script type="module">
+import {auth,db,km,eta,esc,thumb,R,avail,fmt,ONLINE} from './lib.js';
+import {signInAnonymously} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {doc,collection,onSnapshot,setDoc,query,where} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const $=id=>document.getElementById(id);if(!ONLINE){$('onl').previousElementSibling.remove();$('onl').remove()}
+let S={shop:null,menu:[],cart:{},me:null,orders:[]},map,mk={};
+await signInAnonymously(auth);const uid=auth.currentUser.uid;
+onSnapshot(doc(db,'cfg','shop'),d=>{S.shop=d.data()||null;drawMap()});
+onSnapshot(collection(db,'menu'),q=>{S.menu=q.docs.map(d=>d.data()).sort((a,b)=>a.id-b.id);renderMenu()});
+onSnapshot(query(collection(db,'orders'),where('uid','==',uid)),q=>{S.orders=q.docs.map(d=>d.data()).sort((a,b)=>b.id-a.id);renderTrack()});
+const total=()=>S.menu.reduce((s,i)=>s+(avail(i)?(S.cart[i.id]||0)*i.p:0),0);
+$('poster').onclick=()=>$('pz').style.display='flex';$('pz').onclick=()=>$('pz').style.display='none';
+setInterval(()=>renderMenu(),30000);
+function renderMenu(){$('menu').innerHTML=S.menu.map(i=>{const on=avail(i);return `<div class="card row" style="${on?'':'opacity:.55'}"><div class="fl">${thumb(i)}<div><b>${esc(i.n)}</b><br><span class="m">₹${i.p}</span>${i.from&&i.to?`<br><span class="m">🕒 ${fmt(i.from)} – ${fmt(i.to)}</span>`:''}${on?'':'<br><span class="bad">Abhi band hai</span>'}</div></div><div>${on?`<button class="g" data-id="${i.id}" data-d="-1">−</button> ${S.cart[i.id]||0} <button data-id="${i.id}" data-d="1">+</button>`:''}</div></div>`}).join('')||'<div class="m">Menu jald aa raha hai</div>';$('tot').textContent='₹'+total()}
+$('menu').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.cart[b.dataset.id]=Math.max(0,(S.cart[b.dataset.id]||0)+ +b.dataset.d);renderMenu()};
+$('loc').onclick=()=>{if(!S.shop)return alert('Dukaan abhi band hai');navigator.geolocation.getCurrentPosition(p=>{S.me={lat:p.coords.latitude,lng:p.coords.longitude};const d=km(S.shop.lat,S.shop.lng,S.me.lat,S.me.lng);$('ls').innerHTML=d<=R?`<span class="ok">✅ ${d.toFixed(1)} km — delivery available</span>`:`<span class="bad">❌ ${d.toFixed(1)} km — sirf ${R} km tak delivery hai</span>`},()=>alert('Location permission allow karein'),{enableHighAccuracy:true})};
+$('go').onclick=async()=>{
+ const closed=S.menu.filter(i=>S.cart[i.id]&&!avail(i));if(closed.length){alert(closed.map(i=>i.n).join(', ')+' abhi band hai');closed.forEach(i=>delete S.cart[i.id]);renderMenu();return}
+ const items=S.menu.filter(i=>S.cart[i.id]).map(i=>({id:String(i.id),n:i.n,p:i.p,q:S.cart[i.id]}));
+ if(!items.length)return alert('Kuch item chuno');if(!$('nm').value||!$('ph').value||!$('ad').value)return alert('Naam, phone, pata bhariye');
+ if(!S.me||!S.shop)return alert('Pehle location lo');if(km(S.shop.lat,S.shop.lng,S.me.lat,S.me.lng)>R)return alert('Aap '+R+' km service area ke bahar hain');
+ const pay=document.querySelector('input[name=pay]:checked').value,id=Date.now();
+ $('go').disabled=true;
+ try{await setDoc(doc(db,'orders',String(id)),{id,uid,name:$('nm').value,phone:$('ph').value,addr:$('ad').value,lat:S.me.lat,lng:S.me.lng,pay,paid:false,status:pay=='COD'?'new':'awaiting_payment',items,total:total()});S.cart={};renderMenu();if(pay=='Online')await payNow(id)}
+ catch(e){alert('Order nahi ho paya, dobara try karein')}$('go').disabled=false};
+async function payNow(id){const o=S.orders.find(x=>x.id==id)||{};
+ const r=await fetch('/api/create-payment',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({orderId:String(id),token:await auth.currentUser.getIdToken()})});
+ const d=await r.json();if(!r.ok)return alert(d.error||'Payment shuru nahi hua');
+ new Razorpay({key:d.key,amount:d.amount,currency:'INR',name:'Cloud Kitchen',order_id:d.rzpOrderId,prefill:{name:$('nm').value,contact:$('ph').value},theme:{color:'#e8590c'}}).open()}
+window.payNow=payNow;
+function renderTrack(){const o=S.orders[0];if(!o){$('track').innerHTML='';return drawMap()}
+ const L=['new','accepted','out','done'],T=['Order mila','Ban raha hai','Raste me','Deliver'],i=L.indexOf(o.status),e=eta(o);let h=`<div class="card"><b>Order #${String(o.id).slice(-5)}</b> · ₹${o.total} · ${o.pay}`;
+ if(o.status=='awaiting_payment')h+=`<p class="bad">Payment baaki hai</p><button onclick="payNow(${o.id})">Ab pay karo</button>`;
+ else{h+=`<div class="st">${T.map((t,k)=>`<span class="${k<=i?'on':''}">${t}</span>`).join('')}</div>`+(o.paid?'<div class="ok">✅ Payment mil gaya</div>':'')+
+  (o.status=='out'?`<div><b>⏱ Lagbhag ${e??'?'} minute me pahunchega</b></div>`:o.status=='done'?'<div class="ok">✅ Deliver ho gaya. Dhanyavaad!</div>':'<div class="m">Owner ke accept karne ka wait...</div>')}
+ $('track').innerHTML=h+'</div>';drawMap()}
+function drawMap(){const o=S.orders[0],el=$('map');if(!o||!S.shop||!['accepted','out'].includes(o.status)){el.style.display='none';return}
+ el.style.display='block';if(!map){map=L.map(el).setView([o.lat,o.lng],15);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map)}
+ map.invalidateSize();const p={shop:[S.shop,'🏠'],me:[o,'📍']};if(o.rider)p.rider=[o.rider,'🛵'];
+ for(const k in p){const[c,em]=p[k];if(mk[k])mk[k].setLatLng([c.lat,c.lng]);else mk[k]=L.marker([c.lat,c.lng],{icon:L.divIcon({html:`<div style="font-size:26px">${em}</div>`,className:'',iconSize:[30,30]})}).addTo(map)}
+ map.fitBounds(Object.values(mk).map(m=>m.getLatLng()),{padding:[30,30],maxZoom:17})}
+renderMenu();
+</script></body></html>

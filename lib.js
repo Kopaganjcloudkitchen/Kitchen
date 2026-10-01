@@ -1,0 +1,13 @@
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {getFirestore} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {getAuth} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {firebaseConfig,SHOP} from "./config.js";
+const app=initializeApp(firebaseConfig);
+export const db=getFirestore(app),auth=getAuth(app),R=SHOP.radiusKm,NAME=SHOP.name,ONLINE=SHOP.online;
+export const km=(a,b,c,d)=>{const r=x=>x*Math.PI/180,q=Math.sin(r(c-a)/2)**2+Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;return 12742*Math.asin(Math.sqrt(q))};
+export const eta=o=>o.rider?Math.max(2,Math.round(km(o.rider.lat,o.rider.lng,o.lat,o.lng)/15*60)):null;
+export const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+export const thumb=i=>i.img?`<img src="${i.img}" class="th">`:'<div class="th ph">🍽</div>';
+const mins=s=>{const[a,b]=s.split(':');return +a*60+ +b};
+export const avail=i=>{if(!i.from||!i.to)return true;const d=new Date(),n=d.getHours()*60+d.getMinutes(),f=mins(i.from),t=mins(i.to);return f<=t?(n>=f&&n<t):(n>=f||n<t)};
+export const fmt=t=>{const[h,m]=t.split(':');return (+h%12||12)+':'+m+(+h<12?' AM':' PM')};
