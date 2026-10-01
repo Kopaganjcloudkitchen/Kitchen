@@ -23,7 +23,7 @@ function start(){
 function render(){$('orders').innerHTML=orders.map(o=>{const pend=o.status=='awaiting_payment';
  return `<div class="card" style="${pend?'opacity:.6':''}"><div class="row"><b>${esc(o.name)}</b><span class="m">${pend?'payment pending':o.status}</span></div>
  <div>${o.items.map(i=>esc(i.n)+' ×'+i.q).join(', ')}</div><b>₹${o.total}</b> · ${o.pay} ${o.paid?'✅ paid':o.pay=='COD'?'(cash lena hai)':'(unpaid)'}<br>
- <small class="m">${esc(o.phone)} · ${esc(o.addr)}</small><br><a href="https://www.google.com/maps?q=${o.lat},${o.lng}" target="_blank">📍 Customer ki location</a>
+ <small class="m">${esc(o.phone)} · ${esc(o.addr)}</small><br><a href="https://www.google.com/maps/dir/?api=1&destination=${o.lat},${o.lng}&travelmode=driving" target="_blank"><button class="g" type="button">🧭 Route dekho (Google Maps)</button></a> <a href="tel:${esc(o.phone)}"><button class="g" type="button">📞 Call</button></a>
  <div style="margin-top:6px">${pend?`<button class="g" data-a="manual" data-id="${o.id}">Paisa mil gaya (manual)</button>`:''}${o.status=='new'?`<button data-a="accepted" data-id="${o.id}">Accept karo</button>`:''}${o.status=='accepted'?`<button data-a="out" data-id="${o.id}">🛵 Delivery ke liye nikla</button>`:''}${o.status=='out'?`<button data-a="done" data-id="${o.id}">Deliver ho gaya</button>`:''}</div></div>`}).join('')||'<div class="m">Abhi koi order nahi</div>'}
 $('orders').onclick=async e=>{const b=e.target.closest('button');if(!b)return;const r=doc(db,'orders',b.dataset.id),a=b.dataset.a,o=orders.find(x=>x.id==b.dataset.id);
  if(a=='manual')await updateDoc(r,{paid:true,status:'new'});else if(a=='done')await updateDoc(r,{status:'done',paid:true});else await updateDoc(r,{status:a})};
