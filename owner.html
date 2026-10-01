@@ -1,5 +1,6 @@
 <!DOCTYPE html><html lang="hi"><head><meta charset="utf-8"><title>Owner Panel</title>
-<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css"></head><body>
+<meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="style.css">
+<link rel="manifest" href="manifest-owner.webmanifest"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#e8590c"></head><body>
 <h1>👨‍🍳 Owner Panel</h1>
 <div id="login" class="card"><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button class="w" id="li">Login</button><div id="le" class="bad"></div></div>
 <div id="panel" style="display:none">
@@ -9,10 +10,11 @@
 <h2>Orders</h2><div id="orders"></div></div>
 <script type="module">
 import {auth,db,esc,thumb,avail,fmt} from './lib.js';
-import {signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {setPersistence,browserLocalPersistence,signInWithEmailAndPassword,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {doc,collection,onSnapshot,setDoc,updateDoc,deleteDoc,query,orderBy,limit} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 const $=id=>document.getElementById(id);let menu=[],orders=[],started=false,first=true,pimg='',watch=null,last=0,ctx;
-$('li').onclick=async()=>{try{ctx=new AudioContext();await signInWithEmailAndPassword(auth,$('em').value,$('pw').value)}catch(e){$('le').textContent='Email ya password galat hai'}};
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+$('li').onclick=async()=>{try{ctx=new AudioContext();await setPersistence(auth,browserLocalPersistence);await signInWithEmailAndPassword(auth,$('em').value,$('pw').value)}catch(e){$('le').textContent='Email ya password galat hai'}};
 $('lo').onclick=()=>signOut(auth);
 onAuthStateChanged(auth,u=>{const ok=u&&!u.isAnonymous;$('login').style.display=ok?'none':'block';$('panel').style.display=ok?'block':'none';if(ok&&!started){started=true;start()}});
 const beep=()=>{try{const o=ctx.createOscillator();o.connect(ctx.destination);o.frequency.value=880;o.start();setTimeout(()=>o.stop(),600)}catch(e){}};
